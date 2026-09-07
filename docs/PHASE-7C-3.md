@@ -6,7 +6,7 @@ Definir formalmente a camada arquitetural entre a intenção de execução trans
 
 Esta fase prepara a arquitetura para uma futura execução real de Java e Python, sem executar código do aluno. O objetivo é estabelecer contratos, boundaries, estados, responsabilidades e critérios de validação para que a implementação futura seja isolada, testável e segura.
 
-Nenhum contrato de runtime ou adapter descrito neste documento está implementado nesta fase. Eles são especificações para implementação posterior.
+Os contratos de runtime e o boundary do adapter descritos neste documento estão implementados e validados no package `@ciesa/contracts`. O `ExecutionRuntimeAdapter` existe como interface/contrato; ainda não existe implementação concreta nem integração real com o worker.
 
 ## 2. Contexto
 
@@ -52,8 +52,10 @@ O estado existente no início desta fase é:
 - `DockerSandbox` existe para o lifecycle de criação, inspeção e destruição;
 - `RedisExecutionQueue` transporta e valida `ExecutionJob`;
 - o worker privado consome jobs, controla ACK/retry e permanece sem lógica de execução;
-- não existe `ExecutionRuntimeRequest` implementado;
-- não existe `ExecutionRuntimeAdapter` implementado;
+- `ExecutionRuntimeRequest`, `ExecutionRuntimeLimits`, `ExecutionRuntimeResult` e `ExecutionRuntimeStatus` estão implementados em `packages/contracts/src/index.ts`;
+- os contratos de runtime possuem validação estrita e testes em `packages/contracts/src/execution.test.ts`;
+- `ExecutionRuntimeAdapter` está implementado como interface/contrato, sem implementação concreta;
+- não existe integração real entre Worker e Runtime Adapter;
 - não existe execução real de Java, Python, compilação ou avaliação automática.
 
 O `ExecutionJob` atual contém somente:
@@ -67,35 +69,43 @@ O `ExecutionJob` não contém `sourceCode`, comandos, credenciais ou detalhes de
 
 ## 4. Escopo
 
-Faz parte desta fase somente a especificação conceitual de:
+Faz parte desta fase a definição e implementação dos contratos de:
 
-- um contrato futuro `ExecutionRuntimeRequest`;
-- um contrato futuro `ExecutionRuntimeResult`;
-- uma interface conceitual futura `ExecutionRuntimeAdapter`;
+- `ExecutionRuntimeRequest`;
+- `ExecutionRuntimeLimits`;
+- `ExecutionRuntimeResult`;
+- `ExecutionRuntimeStatus`;
+- `ExecutionRuntimeAdapter` como interface/contrato;
 - os estados do job, do sandbox e do resultado;
 - as responsabilidades de cada camada;
 - os requisitos de segurança que as fases futuras deverão preservar;
-- os testes que deverão ser implementados posteriormente;
+- os testes dos contratos implementados;
 - os critérios objetivos de PASS/FAIL.
 
 O `ExecutionJob` continua mínimo e representa apenas a intenção de execução. O `sourceCode` continua fora da fila. O `ExecutionSandbox` continua sendo lifecycle-only.
 
-A forma exata de obter o código submetido para uma execução futura não é definida nesta fase.
+A forma exata de obter o código submetido para uma execução futura não é definida nesta fase. Não existe ainda implementação concreta do adapter nem integração Worker → Runtime Adapter.
 
 ## 5. Arquitetura
 
-O fluxo arquitetural previsto é:
+O fluxo arquitetural atual, com a última ligação ainda contratual, é:
 
 ```text
-ExecutionJob
-      ↓
-Redis Queue
-      ↓
-Worker
-      ↓
-ExecutionRuntimeAdapter
-      ↓
-ExecutionSandbox
+Submission
+   ↓
+sourceCode persistido separadamente
+
+submissionId + attemptId + language
+             ↓
+       ExecutionJob
+             ↓
+        Redis Queue
+             ↓
+          Worker
+             ↓
+ExecutionRuntimeAdapter (contrato)
+             ↓
+      ExecutionSandbox
 ```
 
 A separação de responsabilidades é obrigatória:
@@ -103,8 +113,10 @@ A separação de responsabilidades é obrigatória:
 - `ExecutionJob` representa a intenção de executar uma tentativa;
 - Redis transporta o job;
 - o worker consome o job e delega o processamento;
-- o `ExecutionRuntimeAdapter` coordena futuramente a execução de um runtime;
+- o `ExecutionRuntimeAdapter` define o boundary para uma futura orquestração de runtime;
 - o `ExecutionSandbox` cria, inspeciona e destrói o ambiente isolado.
+
+A ligação concreta entre Worker e Runtime Adapter ainda será implementada em uma fase futura.
 
 O código submetido permanece conceitualmente separado:
 
@@ -123,7 +135,7 @@ O `sourceCode` não deve ser incorporado ao `ExecutionJob`, serializado na fila 
 
 ## 6. ExecutionRuntimeRequest
 
-`ExecutionRuntimeRequest` é um contrato futuro para representar os dados necessários ao adapter para preparar uma execução. Ele não está implementado nesta fase.
+`ExecutionRuntimeRequest` é o contrato implementado para representar os dados necessários ao adapter para preparar uma execução. Ele não contém código submetido nem detalhes arbitrários de infraestrutura.
 
 A proposta mínima é:
 
@@ -172,7 +184,7 @@ Os limites devem ser validados contra uma política aprovada. Este documento nã
 
 ## 7. ExecutionRuntimeResult
 
-`ExecutionRuntimeResult` é um contrato futuro para representar o resultado produzido pelo runtime adapter. Ele não está implementado nesta fase.
+`ExecutionRuntimeResult` é o contrato implementado para representar o resultado que um runtime adapter futuro produzirá. Atualmente não existe runtime que produza esse resultado.
 
 A proposta conceitual mínima é:
 
@@ -220,7 +232,9 @@ O resultado não deve conter secrets, tokens, credenciais, host paths ou detalhe
 
 ## 8. ExecutionRuntimeAdapter
 
-`ExecutionRuntimeAdapter` é uma interface conceitual futura. Ela será a fronteira entre o worker e um runtime de execução, sem expor detalhes de runtime ao worker e sem transferir responsabilidade de execução ao `ExecutionSandbox`.
+`ExecutionRuntimeAdapter` é uma interface/contrato implementado. Ela é a fronteira entre o worker e um runtime futuro, sem expor detalhes de runtime ao worker e sem transferir responsabilidade de execução ao `ExecutionSandbox`.
+
+Ainda não existe implementação concreta do adapter e não existe integração real entre Worker e Runtime Adapter.
 
 A interface deve ser pequena e orientada ao lifecycle da execução. A forma inicial recomendada é uma operação de alto nível que receba um request e produza um result:
 
@@ -242,7 +256,7 @@ Quando uma decomposição explícita for necessária, as responsabilidades conce
 - `collectResult()`: coletar e normalizar o resultado limitado;
 - `cleanup()`: garantir destruição e liberação dos recursos.
 
-Nesta fase, esses métodos são somente conceitos avaliados, não contratos implementados.
+Nesta fase, esses métodos são somente operações conceituais avaliadas. A única operação pública atualmente definida é `execute(request)`; não há implementação concreta dessas operações.
 
 O adapter não deve:
 
@@ -352,7 +366,7 @@ Não deve:
 
 ### ExecutionRuntimeAdapter
 
-Responsável futuramente por:
+Responsabilidade prevista para uma implementação futura:
 
 - adaptar a solicitação ao runtime escolhido;
 - coordenar a execução controlada;
@@ -360,7 +374,7 @@ Responsável futuramente por:
 - obter e normalizar o resultado;
 - controlar o lifecycle necessário para a execução futura.
 
-Nesta fase, somente o boundary e o contrato conceitual são definidos.
+Nesta fase, o boundary e o contrato estão implementados, mas não há adapter concreto nem integração com o worker.
 
 ### ExecutionSandbox
 
@@ -408,7 +422,7 @@ A configuração concreta atualmente documentada pela Fase 7C.2 permanece a refe
 
 ## 12. Testes previstos
 
-Os testes abaixo serão implementados em fases posteriores, quando os contratos e o adapter forem codificados.
+Os contratos abaixo já possuem testes em `packages/contracts/src/execution.test.ts`. Os testes de implementação concreta e integração continuam previstos para fases posteriores.
 
 ### Contratos
 
@@ -424,7 +438,7 @@ Os testes abaixo serão implementados em fases posteriores, quando os contratos 
 
 ### Adapter
 
-Se essas etapas forem expostas no contrato futuro, testar:
+Para uma implementação futura do adapter, testar:
 
 - `prepare`;
 - `start`;
@@ -433,11 +447,11 @@ Se essas etapas forem expostas no contrato futuro, testar:
 - `collectResult`;
 - `cleanup`.
 
-Caso permaneça uma operação de alto nível `execute`, testar o fluxo equivalente como uma unidade contratual, sem exigir que cada etapa seja uma operação pública.
+O contrato atual expõe somente `execute`; o teste existente valida o recebimento do request e o retorno de um resultado controlado, sem execução real.
 
 ### Worker
 
-Validar futuramente:
+A integração futura deverá validar:
 
 - job recebido;
 - delegação para o adapter;
@@ -523,30 +537,29 @@ A fase será considerada **FAIL** se a implementação correspondente fizer qual
 
 ## 15. Próxima etapa
 
-A execução real de runtime será tratada em uma fase posterior e separada.
+A próxima etapa prevista é a **Fase 7C.4**. Ela deverá implementar uma implementação concreta/orquestração controlada do adapter, ainda sem execução real de Java/Python.
 
-Essa fase futura poderá tratar progressivamente de:
+A Fase 7C.4 poderá tratar progressivamente de:
 
-- runtime Java;
-- runtime Python;
-- compilação;
-- execução;
-- captura de stdout/stderr;
-- timeout;
-- resultado real;
-- integração progressiva com o worker.
+- uso do `ExecutionSandbox` por abstração;
+- lifecycle controlado do sandbox;
+- adapter fake ou concreto sem runtime de linguagem;
+- preparação de um boundary futuro para obtenção controlada do `sourceCode`, sem colocá-lo no Redis.
+
+Execução real de Java/Python, compilação, captura real de saída, avaliação e integração completa com o worker permanecem em fases posteriores.
 
 Os detalhes de implementação dessa próxima fase não são definidos por este documento.
 
 ## 16. Limitações conhecidas
 
-- `ExecutionRuntimeRequest` não existe atualmente no código e é apenas uma proposta contratual desta especificação;
-- `ExecutionRuntimeAdapter` não existe atualmente no código e não deve ser considerado implementado;
+- `ExecutionRuntimeRequest`, `ExecutionRuntimeLimits`, `ExecutionRuntimeResult` e `ExecutionRuntimeStatus` existem atualmente em `packages/contracts/src/index.ts` e possuem validações/testes;
+- `ExecutionRuntimeAdapter` existe atualmente como interface/contrato, mas não possui implementação concreta;
 - `ExecutionResult` já existe como tipo em `packages/contracts/src/index.ts`, mas ainda não há runtime que o produza;
 - o `ExecutionJob` atual contém apenas `contractVersion`, `submissionId`, `attemptId` e `language`;
 - a forma futura de obter `sourceCode` a partir da referência da tentativa ainda não foi definida;
 - a persistência de resultados de execução ainda não foi definida;
 - a semântica final dos estados, verdicts e códigos de erro deverá ser refinada antes da implementação do runtime;
-- a separação entre uma operação única `execute` e operações públicas de lifecycle do adapter ainda depende dos requisitos de cancelamento, observabilidade e testes da fase de implementação;
+- a separação entre uma operação única `execute` e operações públicas de lifecycle do adapter ainda depende dos requisitos de cancelamento, observabilidade e testes da implementação concreta;
 - os limites descritos neste documento são requisitos contratuais e referências de segurança, não uma implementação de execução;
-- nenhuma execução real, integração do worker com runtime ou alteração de infraestrutura é criada por esta fase.
+- não existe integração real entre Worker e Runtime Adapter;
+- nenhuma execução real, integração completa do worker com runtime ou alteração de infraestrutura é criada por esta fase.
