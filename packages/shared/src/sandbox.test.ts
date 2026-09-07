@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   defaultSandboxLimits,
   defaultSandboxSecurityRequirements,
+  type DockerSandboxClient,
   DockerSandbox,
   FakeSandbox
 } from './sandbox.js';
@@ -108,7 +109,7 @@ describe('sandbox abstraction', () => {
         createContainer,
         inspectContainer,
         removeContainer
-      } as any
+      } as DockerSandboxClient
     });
 
     await sandbox.create();
@@ -135,7 +136,7 @@ describe('sandbox abstraction', () => {
         }),
         inspectContainer: vi.fn(),
         removeContainer: vi.fn(async () => undefined)
-      } as any
+      } as DockerSandboxClient
     });
 
     await expect(sandbox.create()).rejects.toThrow('docker create failed');
@@ -152,7 +153,7 @@ describe('sandbox abstraction', () => {
         createContainer: vi.fn(async () => ({ id: 'abc-1' })),
         inspectContainer: vi.fn(async () => ({ Id: 'abc-1', State: { Status: 'exited' } })),
         removeContainer
-      } as any
+      } as DockerSandboxClient
     });
 
     await sandbox.create();

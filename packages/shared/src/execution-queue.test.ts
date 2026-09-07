@@ -23,16 +23,17 @@ class MemoryRedis implements RedisClient {
     return this.values.length;
   }
 
-  async brpop(_key: string, _timeoutSeconds: number): Promise<[string, string] | null> {
+  async brpop(key: string, timeoutSeconds: number): Promise<[string, string] | null> {
+    void timeoutSeconds;
     const value = this.values.pop();
-    return value ? [_key, value] : null;
+    return value ? [key, value] : null;
   }
 
   async quit(): Promise<'OK'> {
     return 'OK';
   }
 
-  on(_event: 'error', _listener: (error: Error) => void): this {
+  on(): this {
     return this;
   }
 }

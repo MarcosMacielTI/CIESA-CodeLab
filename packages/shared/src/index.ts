@@ -1,5 +1,6 @@
 import type { ExecutionJob } from '@ciesa/contracts';
-import Redis from 'ioredis';
+export type { ExecutionJob } from '@ciesa/contracts';
+import { Redis } from 'ioredis';
 import { z } from 'zod';
 
 export * from './sandbox.js';

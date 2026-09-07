@@ -5,8 +5,8 @@ export type SandboxLimits = {
   cpuCores: 0.5;
   maxPids: 32;
   temporaryStorageMb: 16;
-  maxStdoutBytes: 65_536;
-  maxStderrBytes: 65_536;
+  maxStdoutBytes: number;
+  maxStderrBytes: number;
   javaCompileTimeoutMs: 5_000;
   javaExecutionTimeoutMs: 2_000;
   pythonExecutionTimeoutMs: 2_000;

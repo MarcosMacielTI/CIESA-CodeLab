@@ -18,6 +18,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
+    "@types/dockerode": "^4.0.1",
     "@types/node": "^22.10.1",
     "eslint": "^9.16.0",
     "typescript": "^5.6.3",
