@@ -152,6 +152,7 @@ function isExecutionRuntimeLimits(value: unknown): value is ExecutionRuntimeLimi
   return (
     isPositiveFiniteNumber(value.timeoutMs) &&
     isPositiveFiniteNumber(value.memoryMb) &&
+    typeof value.pidsLimit === 'number' &&
     Number.isInteger(value.pidsLimit) &&
     value.pidsLimit > 0 &&
     value.networkDisabled === true &&
