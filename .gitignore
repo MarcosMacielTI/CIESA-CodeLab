@@ -1,0 +1,29 @@
+# Node
+node_modules/
+.pnpm-store/
+**/.vite/
+
+# Build outputs
+apps/**/dist/
+packages/**/dist/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Docker / db
+postgres-data/
+redis-data/
+
+# Local validation output
+typecheck-result.txt

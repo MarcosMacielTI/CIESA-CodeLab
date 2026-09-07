@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum CourseStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ClassStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ExerciseDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum SubmissionLanguage {
+  JAVA
+  PYTHON
+}
+
+model HealthCheck {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  message   String
+}
+
+model User {
+  id           String       @id @default(cuid())
+  name         String
+  email        String       @unique
+  passwordHash String
+  role         UserRole     @default(STUDENT)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  teachingClasses Class[]
+  enrollments  Enrollment[]
+  submissions  Submission[]
+
+  @@index([createdAt])
+}
+
+model Course {
+  id          String      @id @default(cuid())
+  name        String
+  code        String      @unique
+  description String?
+  status      CourseStatus @default(ACTIVE)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  classes     Class[]
+  exercises   Exercise[]
+}
+
+model Exercise {
+  id                String             @id @default(cuid())
+  courseId          String
+  title             String
+  statement         String
+  inputDescription  String?
+  outputDescription String?
+  constraints       String?
+  difficulty        ExerciseDifficulty @default(MEDIUM)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  submissions Submission[]
+
+  @@index([courseId])
+}
+
+model Submission {
+  id         String             @id @default(cuid())
+  exerciseId String
+  studentId  String
+  sourceCode String
+  language   SubmissionLanguage
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  student  User     @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@index([exerciseId])
+  @@index([studentId])
+  @@index([exerciseId, studentId])
+  @@index([createdAt])
+}
+
+model Class {
+  id        String      @id @default(cuid())
+  name      String
+  code      String
+  semester  String
+  status    ClassStatus @default(ACTIVE)
+  courseId  String
+  teacherId String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  course      Course      @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  teacher     User        @relation(fields: [teacherId], references: [id], onDelete: Restrict)
+  enrollments Enrollment[]
+
+  @@unique([courseId, code])
+  @@index([courseId])
+  @@index([teacherId])
+}
+
+model Enrollment {
+  id         String           @id @default(cuid())
+  classId    String
+  studentId  String
+  status     EnrollmentStatus @default(ACTIVE)
+  enrolledAt DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  class      Class            @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student    User             @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@unique([classId, studentId])
+  @@index([classId])
+  @@index([studentId])
+}
