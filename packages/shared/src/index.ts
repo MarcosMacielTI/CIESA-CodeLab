@@ -4,6 +4,7 @@ import { Redis } from 'ioredis';
 import { z } from 'zod';
 
 export * from './sandbox.js';
+export * from './runtime-adapter.js';
 
 export const projectInfo = {
   name: 'CIESA CodeLab',
