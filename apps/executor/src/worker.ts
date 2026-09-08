@@ -1,41 +1,38 @@
 import 'dotenv/config';
 import { fileURLToPath } from 'node:url';
 import { appConfig } from '@ciesa/config';
-import type { ExecutionJob } from '@ciesa/contracts';
-import { RedisExecutionQueue, type ExecutionQueue, type ExecutionQueueMessage } from '@ciesa/shared';
+import type { ExecutionRuntimeAdapter } from '@ciesa/contracts';
+import {
+  ConcreteRuntimeAdapter,
+  DockerSandbox,
+  RedisExecutionQueue,
+  defaultSandboxLimits,
+  type ExecutionQueue,
+  type ExecutionQueueMessage
+} from '@ciesa/shared';
 
 type WorkerLogger = {
   info(message: string, metadata?: unknown): void;
   warn(message: string, metadata?: unknown): void;
   error(message: string, metadata?: unknown): void;
 };
-export type ExecutionJobHandler = (job: ExecutionJob) => Promise<void>;
-
 export type ExecutionWorkerOptions = {
   queue: ExecutionQueue;
-  handler?: ExecutionJobHandler;
+  runtimeAdapter: ExecutionRuntimeAdapter;
   logger?: WorkerLogger;
   pollTimeoutSeconds?: number;
-};
-
-const defaultHandler: ExecutionJobHandler = async (job) => {
-  console.info('Execution job received; execution is not implemented', {
-    submissionId: job.submissionId,
-    attemptId: job.attemptId,
-    language: job.language
-  });
 };
 
 export class ExecutionWorker {
   private acceptingJobs = true;
   private readonly queue: ExecutionQueue;
-  private readonly handler: ExecutionJobHandler;
+  private readonly runtimeAdapter: ExecutionRuntimeAdapter;
   private readonly logger: WorkerLogger;
   private readonly pollTimeoutSeconds: number;
 
   constructor(options: ExecutionWorkerOptions) {
     this.queue = options.queue;
-    this.handler = options.handler ?? defaultHandler;
+    this.runtimeAdapter = options.runtimeAdapter;
     this.logger = options.logger ?? console;
     this.pollTimeoutSeconds = options.pollTimeoutSeconds ?? 1;
   }
@@ -61,11 +58,25 @@ export class ExecutionWorker {
     });
 
     try {
-      await this.handler(message.job);
+      const result = await this.runtimeAdapter.execute({
+        submissionId: message.job.submissionId,
+        attemptId: message.job.attemptId,
+        language: message.job.language,
+        limits: {
+          timeoutMs: defaultSandboxLimits.totalJobTimeoutMs,
+          memoryMb: defaultSandboxLimits.memoryMb,
+          pidsLimit: defaultSandboxLimits.maxPids,
+          networkDisabled: true,
+          user: '65532:65532'
+        }
+      });
       this.queue.acknowledge(message);
       this.logger.info('Execution job acknowledged', {
         submissionId: message.job.submissionId,
         attemptId: message.job.attemptId,
+        status: result.status,
+        verdict: result.verdict,
+        errorCode: result.errorCode,
         durationMs: Date.now() - startedAt
       });
     } catch (error) {
@@ -81,7 +92,8 @@ export class ExecutionWorker {
 
 export async function startWorker(): Promise<void> {
   const queue = new RedisExecutionQueue({ redisUrl: appConfig.redisUrl });
-  const worker = new ExecutionWorker({ queue });
+  const runtimeAdapter = new ConcreteRuntimeAdapter(new DockerSandbox());
+  const worker = new ExecutionWorker({ queue, runtimeAdapter });
 
   const shutdown = () => worker.requestShutdown();
   process.once('SIGINT', shutdown);
